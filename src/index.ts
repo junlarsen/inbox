@@ -22,72 +22,72 @@ const isActionQuery = (action: Action): action is Exclude<Action, string> => {
   return typeof action === "object";
 };
 
+const buildElement = (
+  b: XMLBuilder,
+  tag: string,
+  attributes: [att: string, val: string][],
+  txt?: string,
+) => {
+  let builder = b.ele(tag);
+  for (const [att, val] of attributes) {
+    builder = builder.att(att, val);
+  }
+  if (txt) {
+    builder = builder.txt(txt);
+  }
+  return builder.up();
+};
+
 async function process(entry: Entry, b: XMLBuilder) {
   const query =
     typeof entry.query === "string" ? entry.query : entry.query.query;
-  let builder = b
-    .ele("entry")
-    .ele("category")
-    .att("term", "filter")
-    .up()
-    .ele("title")
-    .txt("Mail filter")
-    .up();
+  let builder = b.ele("entry");
+  builder = buildElement(builder, "category", [["term", "filter"]]);
+  builder = buildElement(builder, "title", [], "Mail filter");
 
   if (isActionQuery(entry.query)) {
-    builder = builder
-      .ele("apps:property")
-      .att("name", "hasTheWord")
-      .att("value", entry.query.query)
-      .up();
+    builder = buildElement(builder, "apps:property", [
+      ["name", "hasTheWord"],
+      ["value", entry.query.query],
+    ]);
 
     if (entry.query["skip-the-inbox"]) {
-      builder = builder
-        .ele("apps:property")
-        .att("name", "shouldArchive")
-        .att("value", "true")
-        .up();
+      builder = buildElement(builder, "apps:property", [
+        ["name", "shouldArchive"],
+        ["value", "true"],
+      ]);
     }
 
     if (entry.query["mark-as-read"]) {
-      builder = builder
-        .ele("apps:property")
-        .att("name", "shouldMarkAsRead")
-        .att("value", "true")
-        .up();
+      builder = buildElement(builder, "apps:property", [
+        ["name", "shouldMarkAsRead"],
+        ["value", "true"],
+      ]);
     }
 
     if (entry.query["apply-category"]) {
-      builder = builder
-        .ele("apps:property")
-        .att("name", "smartLabelToApply")
-        .att("value", entry.query["apply-category"] as string)
-        .up();
+      builder = buildElement(builder, "apps:property", [
+        ["name", "smartLabelToApply"],
+        ["value", entry.query["apply-category"] as string],
+      ]);
     }
 
     if (entry.query["star-it"]) {
-      builder = builder
-        .ele("apps:property")
-        .att("name", "shouldStar")
-        .att("value", "true")
-        .up();
+      builder = buildElement(builder, "apps:property", [
+        ["name", "shouldStar"],
+        ["value", "true"],
+      ]);
     }
   } else {
-    builder = builder
-      .ele("apps:property")
-      .att("name", "hasTheWord")
-      .att("value", query)
-      .up();
+    builder = buildElement(builder, "apps:property", [
+      ["name", "hasTheWord"],
+      ["value", query],
+    ]);
   }
-
-  builder = builder
-    .ele("apps:property")
-    .att("name", "label")
-    .att("value", entry.label)
-    .up()
-    .up();
-
-  return builder;
+  return buildElement(builder, "apps:property", [
+    ["name", "label"],
+    ["value", entry.label],
+  ]).up();
 }
 
 async function main() {
