@@ -3,32 +3,91 @@ import toml from "toml";
 import xmlbuilder from "xmlbuilder2";
 import { XMLBuilder } from "xmlbuilder2/lib/interfaces.js";
 
+type Action =
+  | string
+  | {
+      query: string;
+      "skip-the-inbox"?: boolean;
+      "mark-as-read"?: boolean;
+      "star-it"?: boolean;
+      "apply-category"?: string;
+    };
+
 type Entry = {
-  query: string;
+  query: Action;
   label: string;
 };
 
-async function process(entry: Entry, builder: XMLBuilder) {
-  return builder
+const isActionQuery = (action: Action): action is Exclude<Action, string> => {
+  return typeof action === "object";
+};
+
+async function process(entry: Entry, b: XMLBuilder) {
+  const query =
+    typeof entry.query === "string" ? entry.query : entry.query.query;
+  let builder = b
     .ele("entry")
     .ele("category")
     .att("term", "filter")
     .up()
-
     .ele("title")
     .txt("Mail filter")
-    .up()
+    .up();
 
-    .ele("apps:property")
-    .att("name", "hasTheWord")
-    .att("value", entry.query)
-    .up()
+  if (isActionQuery(entry.query)) {
+    builder = builder
+      .ele("apps:property")
+      .att("name", "hasTheWord")
+      .att("value", entry.query.query)
+      .up();
 
+    if (entry.query["skip-the-inbox"]) {
+      builder = builder
+        .ele("apps:property")
+        .att("name", "shouldArchive")
+        .att("value", "true")
+        .up();
+    }
+
+    if (entry.query["mark-as-read"]) {
+      builder = builder
+        .ele("apps:property")
+        .att("name", "shouldMarkAsRead")
+        .att("value", "true")
+        .up();
+    }
+
+    if (entry.query["apply-category"]) {
+      builder = builder
+        .ele("apps:property")
+        .att("name", "smartLabelToApply")
+        .att("value", entry.query["apply-category"] as string)
+        .up();
+    }
+
+    if (entry.query["star-it"]) {
+      builder = builder
+        .ele("apps:property")
+        .att("name", "shouldStar")
+        .att("value", "true")
+        .up();
+    }
+  } else {
+    builder = builder
+      .ele("apps:property")
+      .att("name", "hasTheWord")
+      .att("value", query)
+      .up();
+  }
+
+  builder = builder
     .ele("apps:property")
     .att("name", "label")
     .att("value", entry.label)
     .up()
     .up();
+
+  return builder;
 }
 
 async function main() {
@@ -45,11 +104,10 @@ async function main() {
     .up();
 
   for (const [key, value] of Object.entries(configuration.filters)) {
-    for (const [label, query] of Object.entries(value as any)) {
-      builder = await process(
-        { query: query as any, label: `${key}/${label}` },
-        builder,
-      );
+    for (const [label, query] of Object.entries(
+      value as Record<string, Action>,
+    )) {
+      builder = await process({ query, label: `${key}/${label}` }, builder);
     }
   }
 
